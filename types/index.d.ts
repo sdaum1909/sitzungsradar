@@ -19,6 +19,14 @@ export type Herzschlag = {
   /** Anfang der letzten Eingabe. */
   auftrag?: string
   oberflaeche?: string
+  /** Name der Sitzung wie in der Seitenleiste der App (oder per /rename). */
+  titel?: string
+  /** Aktuelles Kapitel der Sitzung. */
+  abschnitt?: string
+  /** Laufender Schritt der Aufgabenliste; `fertig`, wenn alle erledigt sind. */
+  schritt?: { text: string; nr: number; von: number; fertig?: boolean }
+  /** Kennung der Sitzung in der Desktop-App, für den Sprung hinein. */
+  hostId?: string
 }
 
 /** Was das Panel zeichnet. */

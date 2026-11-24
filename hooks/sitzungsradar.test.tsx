@@ -2,7 +2,18 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import type { Herzschlag } from '../types'
-import { dauer, kopfVon, lageVon, ordnen, projektVon } from './register'
+import {
+  abschnittVon,
+  dauer,
+  kopfVon,
+  lageVon,
+  ordnen,
+  projektVon,
+  protokollAuswerten,
+  schrittVon,
+  spurWeiter,
+  type Spur,
+} from './register'
 
 const JETZT = 1_800_000_000_000
 const ORDNER = '/h/.claude/sitzungsradar'
@@ -30,11 +41,24 @@ const schlag = (teil: Partial<Herzschlag> & { id: string; projekt: string }): He
   ...teil,
 })
 
+const PROTOKOLL = '/h/.claude/projects/website/eigen.jsonl'
+
 /** Ein Ordner im Speicher, und die Antworten, die sonst die Sitzung gibt. */
-const welt = (on: On, dateien: Record<string, { text: string; mtimeMs: number }>) => {
+const welt = (
+  on: On,
+  dateien: Record<string, { text: string; mtimeMs: number }>,
+  env: Record<string, string> = {},
+) => {
   const geloescht: string[] = []
+  const geoeffnet: string[][] = []
   mock.clock(on, { now: JETZT })
-  mock.env(on, { HOME: '/h' })
+  mock.env(on, { HOME: '/h', ...env })
+  on('session.info', () => ({ value: { transcriptPath: PROTOKOLL, platform: 'macos' as const } }))
+  on('fs.stat', (_, e) => {
+    const d = dateien[e.path]
+    if (!d) throw new Error(`ENOENT ${e.path}`)
+    return { value: { kind: 'file' as const, size: d.text.length, mtimeMs: d.mtimeMs, isLink: false } }
+  })
   on('command.register', () => ({ value: { command: 'sitzungsradar' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.status', () => ({ value: undefined }))
@@ -51,7 +75,9 @@ const welt = (on: On, dateien: Record<string, { text: string; mtimeMs: number }>
   on('fs.read', (_, e) => {
     const d = dateien[e.path]
     if (!d) throw new Error(`ENOENT ${e.path}`)
-    return { value: d.text }
+    // Testdaten sind ASCII: Zeichen und Bytes zählen gleich.
+    const ab = e.offset ?? 0
+    return { value: d.text.slice(ab, e.length === undefined ? undefined : ab + e.length) }
   })
   on('fs.list', (_, e) => ({
     value: Object.entries(dateien)
@@ -65,13 +91,35 @@ const welt = (on: On, dateien: Record<string, { text: string; mtimeMs: number }>
       })),
   }))
   on('process.run', (_, e) => {
-    geloescht.push(...e.argv.slice(2))
+    if (e.argv[0] === 'open') geoeffnet.push([...e.argv])
+    else geloescht.push(...e.argv.slice(2))
     return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
-  return { dateien, geloescht }
+  return { dateien, geloescht, geoeffnet }
 }
 
 const datei = (h: Herzschlag, mtimeMs = h.zuletzt) => ({ text: JSON.stringify(h), mtimeMs })
+
+/** Zeilen, wie sie im Protokoll einer Sitzung stehen (JSONL). */
+const aufruf = (id: string, name: string, input: Record<string, unknown>) =>
+  JSON.stringify({
+    type: 'assistant',
+    message: { content: [{ type: 'tool_use', id, name, input }] },
+  })
+const KAPITEL = 'mcp__ccd_session__mark_chapter'
+const PLAN = 'mcp__ccd_turn__update_plan'
+const ABSCHLUSS = 'mcp__ccd_turn__wrap_up'
+const titelZeile = (t: string) => JSON.stringify({ type: 'custom-title', customTitle: t, sessionId: 'eigen' })
+
+// Der Testlauf hat einen Zeitgeber; die Typen des Mods kennen ihn nicht.
+declare const setTimeout: (fn: () => void, ms: number) => unknown
+
+/** Wartet, bis die Arbeit im Hintergrund fertig ist (sie startet ohne await). */
+const bis = async (fertig: () => boolean) => {
+  for (let i = 0; i < 200 && !fertig(); i++) await new Promise<void>(r => setTimeout(() => r(), 1))
+}
+const eigenVon = (dateien: Record<string, { text: string }>) =>
+  JSON.parse(dateien[`${ORDNER}/eigen.json`]?.text ?? '{}') as Herzschlag
 
 test('das Panel zeigt fremde Sitzungen und die eigene, auf jeder Oberfläche', async ($, on) => {
   const { dateien, geloescht } = welt(on, {
@@ -168,4 +216,151 @@ test('Projektname, Dauer und Lage', () => {
   )
   expect(zeilen.map(z => z.h.id)).toEqual(['2', '3', '1'])
   expect(kopfVon(zeilen)).toBe('3 Sitzungen · 1 braucht dich · 1 wartet · 1 arbeitet')
+})
+
+test('fremde Sitzung: Titel vorn, Herkunft dahinter, Abschnitt, und ein Knopf hinein', async ($, on) => {
+  const { geoeffnet } = welt(
+    on,
+    {
+      [`${ORDNER}/a.json`]: datei(
+        schlag({
+          id: 'a',
+          projekt: 'shop-relaunch',
+          zweig: 'login',
+          titel: 'Anmeldeseite bauen',
+          abschnitt: 'Formular',
+          schritt: { text: 'Tests schreiben', nr: 2, von: 5 },
+          hostId: 'local_abc-123',
+        }),
+      ),
+      [`${ORDNER}/b.json`]: datei(schlag({ id: 'b', projekt: 'rechnungs-app' })),
+      [`${ORDNER}/c.json`]: datei(schlag({ id: 'c', projekt: 'notizen', hostId: 'local_../../x' })),
+    },
+    { CLAUDE_CODE_HOST_SESSION_ID: 'local_eigen-1' },
+  )
+  await $.session.start({ cwd: '/h/code/website', surface: 'desktop', isInteractive: true })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ ...PANE, surface })
+    expect((await ui.find({ type: 'Text', text: /Anmeldeseite/ }))?.text).toBe('○ Anmeldeseite bauen')
+    expect((await ui.find({ type: 'Text', text: /shop-relaunch/ }))?.text).toBe(
+      '  wartet auf dich seit 1 min · shop-relaunch › login',
+    )
+    expect((await ui.find({ type: 'Text', text: /Abschnitt/ }))?.text).toBe(
+      '  Abschnitt: Formular · Schritt 2/5: Tests schreiben',
+    )
+    expect(Boolean(await ui.find({ key: 'oeffnen-a' }))).toBe(true)
+    // Ohne gültige Kennung und für die eigene Sitzung gibt es keinen Knopf.
+    expect(Boolean(await ui.find({ key: 'oeffnen-b' }))).toBe(false)
+    expect(Boolean(await ui.find({ key: 'oeffnen-c' }))).toBe(false)
+    expect(Boolean(await ui.find({ key: 'oeffnen-eigen' }))).toBe(false)
+    await ui.unmount()
+  }
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'oeffnen-a' })
+  await bis(() => geoeffnet.length > 0)
+  expect(geoeffnet).toEqual([['open', 'claude://code/continue?session=local_abc-123']])
+  await ui.unmount()
+
+  const r = await $.command.run({
+    command: 'sitzungsradar',
+    args: '',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: false, columns: 200 },
+  })
+  expect(r.text).toContain('Anmeldeseite bauen: wartet auf dich seit 1 min')
+  expect(r.text).toContain('   Öffnen: claude://code/continue?session=local_abc-123')
+})
+
+test('die eigene Sitzung liest Titel, Kapitel und Schritt aus ihrem Protokoll, ohne doppelt zu zählen', async ($, on) => {
+  const plan = {
+    items: [
+      { content: 'Code sichten', status: 'completed' },
+      { content: 'Tests schreiben', status: 'in_progress' },
+      { content: 'Veröffentlichen', status: 'pending' },
+    ],
+  }
+  // Jeder Aufruf steht zweimal im Protokoll; der Titel ist JSON-maskiert.
+  const zeilen = [
+    titelZeile('alt'),
+    aufruf('toolu_1', KAPITEL, { title: 'Erkundung' }),
+    aufruf('toolu_1', KAPITEL, { title: 'Erkundung' }),
+    aufruf('toolu_2', PLAN, plan),
+    aufruf('toolu_2', PLAN, plan),
+    titelZeile('Radar "Abschnitte" bauen'),
+    aufruf('toolu_3', KAPITEL, { title: 'Umsetzung' }),
+  ]
+  const { dateien } = welt(
+    on,
+    { [PROTOKOLL]: { text: `${zeilen.join('\n')}\n`, mtimeMs: JETZT } },
+    { CLAUDE_CODE_HOST_SESSION_ID: 'local_eigen-1' },
+  )
+  on('tool.call', () => ({ result: {} }))
+  on('turn.complete', () => ({ text: '' }))
+
+  await $.session.start({ cwd: '/h/code/website', surface: 'desktop', isInteractive: true })
+  await bis(() => eigenVon(dateien).abschnitt === 'Umsetzung')
+  let eigen = eigenVon(dateien)
+  expect(eigen.titel).toBe('Radar "Abschnitte" bauen')
+  expect(eigen.abschnitt).toBe('Umsetzung')
+  expect(eigen.schritt).toEqual({ text: 'Tests schreiben', nr: 2, von: 3 })
+  expect(eigen.hostId).toBe('local_eigen-1')
+
+  // Live aus dem Werkzeugaufruf, bevor das Protokoll ihn kennt.
+  await $.tool.call({ tool: PLAN, advance: true, tool_use_id: 'toolu_4' } as never)
+  expect(eigenVon(dateien).schritt).toEqual({ text: 'Veröffentlichen', nr: 3, von: 3 })
+
+  // Danach steht derselbe Aufruf zweimal im Protokoll: er zählt nicht noch einmal.
+  const neu = [aufruf('toolu_4', PLAN, { advance: true }), aufruf('toolu_4', PLAN, { advance: true })]
+  const p = dateien[PROTOKOLL]
+  if (p) p.text += `${neu.join('\n')}\n`
+  await $.turn.complete({ answer: '', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+  await bis(() => false)
+  eigen = eigenVon(dateien)
+  expect(eigen.schritt).toEqual({ text: 'Veröffentlichen', nr: 3, von: 3 })
+
+  await $.tool.call({ tool: ABSCHLUSS, recap: 'fertig', tool_use_id: 'toolu_5' } as never)
+  expect(eigenVon(dateien).schritt).toEqual({ text: '', nr: 3, von: 3, fertig: true })
+})
+
+test('Aufgabenliste, Schritt und Abschnittszeilen', () => {
+  let s: Spur = {}
+  s = spurWeiter(s, PLAN, {
+    items: [
+      { content: 'Eins', status: 'in_progress' },
+      { content: 'Zwei', status: 'pending' },
+      { content: 'Drei', status: 'pending' },
+    ],
+  })
+  expect(schrittVon(s.plan)).toEqual({ text: 'Eins', nr: 1, von: 3 })
+  s = spurWeiter(s, PLAN, { advance: true })
+  expect(schrittVon(s.plan)).toEqual({ text: 'Zwei', nr: 2, von: 3 })
+  s = spurWeiter(s, PLAN, { done: [2], start: 3 })
+  expect(schrittVon(s.plan)).toEqual({ text: 'Drei', nr: 3, von: 3 })
+  s = spurWeiter(s, PLAN, { start: 1 })
+  expect(s.plan?.map(p => p.status)).toEqual(['in_progress', 'completed', 'pending'])
+  s = spurWeiter(s, PLAN, { done: [9], start: 0 })
+  expect(schrittVon(s.plan)).toEqual({ text: 'Eins', nr: 1, von: 3 })
+  s = spurWeiter(s, ABSCHLUSS, {})
+  expect(schrittVon(s.plan)).toEqual({ text: '', nr: 3, von: 3, fertig: true })
+  s = spurWeiter(s, KAPITEL, { title: '  Tests\n und Prüfung ' })
+  expect(s.abschnitt).toBe('Tests und Prüfung')
+  expect(spurWeiter(s, KAPITEL, { title: '' }).abschnitt).toBe('Tests und Prüfung')
+  expect(schrittVon([])).toBe(undefined)
+
+  const f = protokollAuswerten(
+    [titelZeile('Erst'), aufruf('t1', KAPITEL, { title: 'A {b} [c]' }), titelZeile('Dann'), '{"halb":'].join('\n') +
+      aufruf('t2', PLAN, { items: [] }).slice(0, -12),
+  )
+  expect(f.titel).toBe('Dann')
+  expect(f.aufrufe.map(a => [a.id, a.a.title])).toEqual([['t1', 'A {b} [c]']])
+
+  const h = schlag({ id: 'x', projekt: 'P', abschnitt: 'Umsetzung', schritt: { text: 'Tests', nr: 2, von: 4 } })
+  expect(abschnittVon(h, 60)).toEqual(['  Abschnitt: Umsetzung · Schritt 2/4: Tests'])
+  expect(abschnittVon(h, 30)).toEqual(['  Abschnitt: Umsetzung', '  Schritt 2/4: Tests'])
+  expect(abschnittVon({ ...h, abschnitt: undefined, schritt: { text: '', nr: 4, von: 4, fertig: true } }, 60)).toEqual([
+    '  Plan erledigt (4/4)',
+  ])
+  expect(abschnittVon(schlag({ id: 'y', projekt: 'P' }), 60)).toEqual([])
 })

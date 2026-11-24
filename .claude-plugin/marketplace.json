@@ -8,7 +8,7 @@
     {
       "name": "sitzungsradar",
       "source": "./",
-      "description": "Panel mit allen gerade laufenden Claude-Code-Sitzungen über alle Projekte."
+      "description": "Panel mit allen gerade laufenden Claude-Code-Sitzungen über alle Projekte, mit Abschnitt, Schritt und Sprung in die Sitzung."
     }
   ]
 }

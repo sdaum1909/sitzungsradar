@@ -22,11 +22,33 @@ const AUFTRAG_LAENGE = 140
 /** Werkzeuge, die auf eine Antwort von dir warten. */
 const FRAGT_DICH = new Set(['AskUserQuestion', 'ExitPlanMode'])
 
+// Kapitel und Aufgabenliste setzt die Desktop-App über diese Werkzeuge.
+const KAPITEL = 'mcp__ccd_session__mark_chapter'
+const PLAN = 'mcp__ccd_turn__update_plan'
+const ABSCHLUSS = 'mcp__ccd_turn__wrap_up'
+const SPUR_WERKZEUGE = new Set([KAPITEL, PLAN, ABSCHLUSS])
+/** So sieht die Kennung einer Sitzung in der Desktop-App aus. */
+const HOST_ID = /^local_[A-Za-z0-9-]{1,64}$/
+const linkVon = (hostId: string) => `claude://code/continue?session=${hostId}`
+// Im Protokoll (JSONL) stehen Titel und Werkzeugaufrufe als eigene Datensätze.
+const TITEL_MUSTER = /"type":"custom-title","customTitle":"((?:[^"\\]|\\.)*)"/g
+const AUFRUF_MUSTER =
+  /"type":"tool_use","id":"([^"]+)","name":"(mcp__ccd_session__mark_chapter|mcp__ccd_turn__update_plan|mcp__ccd_turn__wrap_up)","input":/g
+/** Höchstens so viel liest ein Aufruf von $.fs.read. */
+const BLOCK = 4 * 1024 * 1024
+/** Beim ersten Blick höchstens so weit zurück. */
+const SUCHE_MAX = 16 * 1024 * 1024
+/** So viel liest jeder Blick noch einmal, falls ein Datensatz gerade halb geschrieben war. */
+const UEBERLAPPUNG = 64 * 1024
+const TEXT_LAENGE = 80
+const PLAN_MAX = 30
+const GESEHEN_MAX = 2000
+
 // Tag ändern, wenn sich die Felder von Radar ändern: ein älterer Wert wird dann verworfen.
 const radar = atom(
   { plugin: 'sitzungsradar', key: 'radar' } as const,
   { liste: [], gelesen: 0 },
-  { shape: 'radar-1' },
+  { shape: 'radar-2' },
 )
 
 type Einstellungen = {
@@ -109,7 +131,129 @@ export const ordnen = (liste: readonly Herzschlag[], jetzt: number, ruhigAbMs: n
         a.h.id.localeCompare(b.h.id),
     )
 
-const titelVon = (h: Herzschlag) => `${h.projekt}${h.zweig ? ` › ${h.zweig}` : ''}`
+const herkunftVon = (h: Herzschlag) => `${h.projekt}${h.zweig ? ` › ${h.zweig}` : ''}`
+/** Der Name, unter dem du die Sitzung kennst: ihr Titel, sonst Projekt und Worktree. */
+const anzeigeVon = (h: Herzschlag) => h.titel || herkunftVon(h)
+const hatSprung = (h: Herzschlag, eigeneId?: string) =>
+  h.id !== eigeneId && !!h.hostId && HOST_ID.test(h.hostId)
+
+/** Kapitel und Schritt, in einer Zeile oder, wenn sie nicht passt, in zweien. */
+export const abschnittVon = (h: Herzschlag, breite: number): string[] => {
+  const teile: string[] = []
+  if (h.abschnitt) teile.push(`Abschnitt: ${h.abschnitt}`)
+  const s = h.schritt
+  if (s) teile.push(s.fertig ? `Plan erledigt (${s.von}/${s.von})` : `Schritt ${s.nr}/${s.von}: ${s.text}`)
+  if (teile.length === 0) return []
+  const eine = `  ${teile.join(' · ')}`
+  if (eine.length <= breite || teile.length === 1) return [kuerzen(eine, breite)]
+  return teile.map(t => kuerzen(`  ${t}`, breite))
+}
+
+// ---- Kapitel und Aufgabenliste -------------------------------------------------------
+
+type Punkt = { text: string; status: 'pending' | 'in_progress' | 'completed' }
+export type Spur = { abschnitt?: string; plan?: Punkt[] }
+type Aufruf = { id: string; tool: string; a: Record<string, unknown> }
+
+const zeile = (v: unknown) => (typeof v === 'string' ? kuerzen(einzeilig(v), TEXT_LAENGE) : '')
+
+/** Wendet einen Aufruf von Kapitel, Aufgabenliste oder Abschluss an, so wie die App ihn liest. */
+export function spurWeiter(s: Spur, tool: string, a: Record<string, unknown>): Spur {
+  if (tool === KAPITEL) {
+    const t = zeile(a.title)
+    return t ? { ...s, abschnitt: t } : s
+  }
+  if (tool === ABSCHLUSS)
+    return s.plan ? { ...s, plan: s.plan.map(p => ({ ...p, status: 'completed' })) } : s
+  if (tool !== PLAN) return s
+  let plan: Punkt[] = (s.plan ?? []).map(p => ({ ...p }))
+  if (Array.isArray(a.items))
+    plan = a.items.slice(0, PLAN_MAX).map(p => {
+      const o = (p && typeof p === 'object' ? p : {}) as Record<string, unknown>
+      const status = o.status === 'in_progress' || o.status === 'completed' ? o.status : 'pending'
+      return { text: zeile(o.content), status }
+    })
+  const stelle = (v: unknown) =>
+    typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= plan.length ? v - 1 : -1
+  if (Array.isArray(a.done))
+    for (const d of a.done) {
+      const p = plan[stelle(d)]
+      if (p) p.status = 'completed'
+    }
+  const start = plan[stelle(a.start)]
+  if (start) {
+    for (const p of plan) if (p.status === 'in_progress') p.status = 'pending'
+    start.status = 'in_progress'
+  }
+  if (a.advance === true) {
+    const jetzt = plan.findIndex(p => p.status === 'in_progress')
+    const laeuft = plan[jetzt]
+    if (laeuft) laeuft.status = 'completed'
+    let weiter = plan.findIndex((p, i) => i > jetzt && p.status === 'pending')
+    if (weiter < 0) weiter = plan.findIndex(p => p.status === 'pending')
+    const naechster = plan[weiter]
+    if (naechster) naechster.status = 'in_progress'
+  }
+  return { ...s, plan }
+}
+
+/** Der laufende Schritt; sind alle erledigt, das; sonst der nächste offene. */
+export function schrittVon(plan?: readonly Punkt[]): Herzschlag['schritt'] {
+  if (!plan || plan.length === 0) return undefined
+  const von = plan.length
+  let i = plan.findIndex(p => p.status === 'in_progress')
+  if (i < 0) {
+    if (plan.every(p => p.status === 'completed')) return { text: '', nr: von, von, fertig: true }
+    i = plan.findIndex(p => p.status === 'pending')
+  }
+  const p = plan[i]
+  return p ? { text: p.text, nr: i + 1, von } : undefined
+}
+
+/** Das JSON-Objekt, das bei `i` beginnt, mit Rücksicht auf Zeichenketten. */
+function objektAb(t: string, i: number): string | undefined {
+  if (t[i] !== '{') return undefined
+  let tiefe = 0
+  let inText = false
+  for (let j = i; j < t.length; j++) {
+    const c = t[j]
+    if (inText) {
+      if (c === '\\') j++
+      else if (c === '"') inText = false
+      continue
+    }
+    if (c === '"') inText = true
+    else if (c === '{' || c === '[') tiefe++
+    else if ((c === '}' || c === ']') && --tiefe === 0) return t.slice(i, j + 1)
+  }
+  return undefined
+}
+
+/** Titel und Aufrufe in einem Stück Protokoll, in der Reihenfolge, in der sie stehen. */
+export function protokollAuswerten(t: string): { titel?: string; aufrufe: Aufruf[] } {
+  let titel: string | undefined
+  for (const m of t.matchAll(TITEL_MUSTER)) {
+    try {
+      const v = zeile(JSON.parse(`"${m[1]}"`))
+      if (v) titel = v
+    } catch {
+      // abgeschnitten
+    }
+  }
+  const aufrufe: Aufruf[] = []
+  for (const m of t.matchAll(AUFRUF_MUSTER)) {
+    const roh = objektAb(t, (m.index ?? 0) + m[0].length)
+    if (!roh || !m[1] || !m[2]) continue
+    try {
+      const a: unknown = JSON.parse(roh)
+      if (a && typeof a === 'object' && !Array.isArray(a))
+        aufrufe.push({ id: m[1], tool: m[2], a: a as Record<string, unknown> })
+    } catch {
+      // halb geschrieben: der nächste Blick liest es noch einmal
+    }
+  }
+  return { titel, aufrufe }
+}
 
 export const zustandVon = (h: Herzschlag, lage: Lage, jetzt: number) => {
   const w = h.werkzeug
@@ -151,6 +295,119 @@ let zuletztAufgeraeumt = 0
 let statuszeile: string | undefined
 let stand: Radar = { liste: [], gelesen: 0 }
 let zaehler = 0
+// Titel und Abschnitt dieser Sitzung, aus ihrem eigenen Protokoll und den Werkzeugaufrufen.
+let titel: string | undefined
+let spur: Spur = {}
+let protokoll: { pfad: string; bis: number } | undefined
+let protokollLaeuft: Promise<void> | undefined
+const gesehen = new Set<string>()
+
+function spurZuruecksetzen() {
+  titel = undefined
+  spur = {}
+  protokoll = undefined
+  protokollLaeuft = undefined
+  gesehen.clear()
+}
+
+/** true, wenn die Aufruf-Id neu ist; merkt sie sich (begrenzt). */
+function merken(id: string) {
+  if (gesehen.has(id)) return false
+  gesehen.add(id)
+  if (gesehen.size > GESEHEN_MAX) {
+    const alt = gesehen.values().next().value
+    if (alt !== undefined) gesehen.delete(alt)
+  }
+  return true
+}
+
+function anwenden(fund: ReturnType<typeof protokollAuswerten>) {
+  if (fund.titel) titel = fund.titel
+  for (const a of fund.aufrufe) if (merken(a.id)) spur = spurWeiter(spur, a.tool, a.a)
+}
+
+/**
+ * Liest das eigene Protokoll nur dort, wo es gewachsen ist. Beim ersten Blick von hinten
+ * in Blöcken, bis Titel, Kapitel und Aufgabenliste gefunden sind (höchstens SUCHE_MAX).
+ */
+async function protokollLesenJetzt($: Api) {
+  const info = await $.session.info()
+  const pfad = info.transcriptPath
+  if (!pfad) return
+  const st = await $.fs.stat(pfad)
+  if (st.kind !== 'file') return
+  const groesse = st.size
+  if (protokoll && protokoll.pfad === pfad && protokoll.bis === groesse) return
+
+  if (!protokoll || protokoll.pfad !== pfad || groesse < protokoll.bis) {
+    const funde: ReturnType<typeof protokollAuswerten>[] = []
+    let ende = groesse
+    let gelesen = 0
+    let hatTitel = false
+    let hatKapitel = false
+    let hatPlan = false
+    while (ende > 0 && gelesen < SUCHE_MAX) {
+      const start = Math.max(0, ende - BLOCK)
+      const fund = protokollAuswerten(await $.fs.read(pfad, { offset: start, length: ende - start }))
+      funde.unshift(fund)
+      gelesen += ende - start
+      hatTitel ||= !!fund.titel
+      for (const a of fund.aufrufe) {
+        if (a.tool === KAPITEL) hatKapitel = true
+        if (a.tool === PLAN && Array.isArray(a.a.items)) hatPlan = true
+      }
+      if (start === 0 || (hatTitel && hatKapitel && hatPlan)) break
+      ende = start + UEBERLAPPUNG
+    }
+    gesehen.clear()
+    spur = {}
+    titel = undefined
+    for (const f of funde) anwenden(f)
+  } else {
+    let pos = Math.max(0, protokoll.bis - UEBERLAPPUNG, groesse - SUCHE_MAX)
+    while (pos < groesse) {
+      const laenge = Math.min(BLOCK, groesse - pos)
+      anwenden(protokollAuswerten(await $.fs.read(pfad, { offset: pos, length: laenge })))
+      if (pos + laenge >= groesse) break
+      pos += laenge - UEBERLAPPUNG
+    }
+  }
+  protokoll = { pfad, bis: groesse }
+}
+
+/** Nie zwei Blicke gleichzeitig; danach den Herzschlag schreiben, wenn sich etwas geändert hat. */
+function protokollLesen($: Api) {
+  if (protokollLaeuft) return protokollLaeuft
+  const vorher = JSON.stringify([titel, spur.abschnitt, schrittVon(spur.plan)])
+  protokollLaeuft = protokollLesenJetzt($)
+    .catch(() => {})
+    .then(async () => {
+      if (JSON.stringify([titel, spur.abschnitt, schrittVon(spur.plan)]) !== vorher) await schreiben($)
+    })
+    .finally(() => {
+      protokollLaeuft = undefined
+    })
+  return protokollLaeuft
+}
+
+/** Öffnet die Sitzung in der Desktop-App; klappt das nicht, steht der Link im Hinweis. */
+async function springen($: Api, hostId?: string) {
+  if (!hostId || !HOST_ID.test(hostId)) return
+  const url = linkVon(hostId)
+  try {
+    const windows = (await $.session.info().catch(() => undefined))?.platform === 'windows'
+    const befehl = windows ? ['rundll32', 'url.dll,FileProtocolHandler', url] : ['open', url]
+    const r = await $.process.run(befehl, { timeoutMs: 5_000 })
+    if (r.exitCode === 0) return
+  } catch {
+    // weiter zum Hinweis
+  }
+  try {
+    $.ui.toast(`Sitzung lässt sich nicht öffnen. Link: ${url}`)
+  } catch {
+    // kein Hinweis möglich
+  }
+}
 
 async function ordnerHolen($: Api) {
   if (ordnerPfad) return ordnerPfad
@@ -171,11 +428,12 @@ const werkzeugJetzt = () => {
 }
 
 async function anfangen($: Api, id: string, jetzt: number): Promise<Herzschlag> {
-  const [ordner, repo, modell, oberflaeche] = await Promise.all([
+  const [ordner, repo, modell, oberflaeche, host] = await Promise.all([
     $.session.cwd(),
     $.session.repo().catch(() => null),
     $.session.model().catch(() => undefined),
     $.session.surface().catch(() => null),
+    $.env.get('CLAUDE_CODE_HOST_SESSION_ID').catch(() => undefined),
   ])
   return {
     v: 1,
@@ -187,6 +445,7 @@ async function anfangen($: Api, id: string, jetzt: number): Promise<Herzschlag> 
     statusSeit: jetzt,
     zuletzt: jetzt,
     oberflaeche: oberflaeche ?? undefined,
+    hostId: host && HOST_ID.test(host) ? host : undefined,
   }
 }
 
@@ -205,7 +464,15 @@ async function schreibenJetzt($: Api, aenderung: Partial<Herzschlag>) {
     eigene = await anfangen($, id, jetzt)
   }
   const vorher = eigene.status
-  eigene = { ...eigene, ...aenderung, werkzeug: werkzeugJetzt(), zuletzt: jetzt }
+  eigene = {
+    ...eigene,
+    ...aenderung,
+    titel,
+    abschnitt: spur.abschnitt,
+    schritt: schrittVon(spur.plan),
+    werkzeug: werkzeugJetzt(),
+    zuletzt: jetzt,
+  }
   if (aenderung.status && aenderung.status !== vorher) eigene.statusSeit = jetzt
   await $.fs.write(dateiVon(ordner, id), JSON.stringify(eigene))
 }
@@ -304,6 +571,7 @@ export const register: Register = (on, options) => {
   stand = { liste: [], gelesen: 0 }
   zuletztAufgeraeumt = 0
   zaehler = 0
+  spurZuruecksetzen()
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -312,11 +580,16 @@ export const register: Register = (on, options) => {
     })
     schreibTakt?.cancel()
     leseTakt?.cancel()
-    schreibTakt = $.clock.every(TAKT_SCHREIBEN_MS, () => void schreiben($))
+    schreibTakt = $.clock.every(TAKT_SCHREIBEN_MS, () => {
+      void schreiben($)
+      void protokollLesen($)
+    })
     leseTakt = $.clock.every(TAKT_LESEN_MS, () => void lesen($).catch(() => {}))
     await schreiben($)
     await lesen($).catch(() => {})
     if (cfg.beimStartOeffnen) void oeffnen($)
+    // Titel und Abschnitt im Hintergrund nachholen; der Start wartet nicht darauf.
+    void protokollLesen($)
 
     return next(e)
   })
@@ -327,10 +600,12 @@ export const register: Register = (on, options) => {
     const zeilen = ordnen(stand.liste, stand.gelesen, cfg.ruhigAbMs)
     const text = [
       `${TITEL}: ${zeilen.length ? kopfVon(zeilen) : 'keine Sitzung gemeldet'}`,
-      ...zeilen.map(
-        ({ h, lage }) =>
-          `${ZEICHEN[lage]} ${titelVon(h)}${h.id === stand.eigeneId ? ' (diese Sitzung)' : ''}: ${zustandVon(h, lage, stand.gelesen)}`,
-      ),
+      ...zeilen.flatMap(({ h, lage }) => [
+        `${ZEICHEN[lage]} ${anzeigeVon(h)}${h.id === stand.eigeneId ? ' (diese Sitzung)' : ''}: ${zustandVon(h, lage, stand.gelesen)}`,
+        ...(h.titel ? [`   ${herkunftVon(h)}`] : []),
+        ...abschnittVon(h, 200).map(z => ` ${z}`),
+        ...(hatSprung(h, stand.eigeneId) && h.hostId ? [`   Öffnen: ${linkVon(h.hostId)}`] : []),
+      ]),
       ...(platz.isPlaced ? [] : ['', 'Das Panel hat gerade keinen Platz, die Liste steht deshalb hier.']),
     ].join('\n')
 
@@ -347,6 +622,7 @@ export const register: Register = (on, options) => {
       // Vom System gestartete Züge (Benachrichtigungen) behalten den letzten Auftrag.
       if (cfg.zeigeAuftrag && t && !t.startsWith('<')) aenderung.auftrag = kuerzen(t, AUFTRAG_LAENGE)
       await schreiben($, aenderung)
+      void protokollLesen($)
     }
     return next(e)
   })
@@ -356,11 +632,15 @@ export const register: Register = (on, options) => {
     if (e.agentId === undefined) {
       laufend.clear()
       await schreiben($, { status: 'wartet' })
+      void protokollLesen($)
     }
     return ergebnis
   })
 
   on('tool.call', async ($, e, next) => {
+    // Kapitel und Aufgabenliste sofort übernehmen, ohne aufs Protokoll zu warten.
+    if (e.agentId === undefined && SPUR_WERKZEUGE.has(e.tool) && (!e.tool_use_id || merken(e.tool_use_id)))
+      spur = spurWeiter(spur, e.tool, e as unknown as Record<string, unknown>)
     const schluessel = e.tool_use_id || `w${++zaehler}`
     laufend.set(schluessel, { name: werkzeugName(e.tool), seit: await $.clock.now() })
     await schreiben($)
@@ -375,8 +655,10 @@ export const register: Register = (on, options) => {
   on('session.end', async ($, e, next) => {
     kette = kette.then(() => abschliessen($)).catch(() => {})
     await kette
-    if (e.reason === 'clear') eigene = undefined
-    else {
+    if (e.reason === 'clear') {
+      eigene = undefined
+      spurZuruecksetzen()
+    } else {
       schreibTakt?.cancel()
       leseTakt?.cancel()
     }
@@ -384,11 +666,19 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     const r = await read($, radar)
     const breite = Math.max(20, e.props.bodyColumns ?? 40)
     const ruhigAb = r.ruhigAbMs ?? 15 * 60_000
     const zeilen = ordnen(r.liste, r.gelesen, ruhigAb)
+    const kopf = (s: Herzschlag, lage: Lage, platz: number) => (
+      <Text color={FARBE[lage]} dimColor={lage === 'ruhig'}>
+        {kuerzen(
+          `${ZEICHEN[lage]} ${anzeigeVon(s)}${s.id === r.eigeneId ? '  (diese Sitzung)' : ''}`,
+          platz,
+        )}
+      </Text>
+    )
 
     return (
       <Box flexDirection="column">
@@ -402,18 +692,28 @@ export const register: Register = (on, options) => {
         {zeilen.map(({ h: s, lage }) => (
           <Box flexDirection="column">
             <Text> </Text>
-            <Text color={FARBE[lage]} dimColor={lage === 'ruhig'}>
-              {kuerzen(
-                `${ZEICHEN[lage]} ${titelVon(s)}${s.id === r.eigeneId ? '  (diese Sitzung)' : ''}`,
-                breite,
-              )}
-            </Text>
+            {hatSprung(s, r.eigeneId) ? (
+              <Box flexDirection="row" justifyContent="space-between" columnGap={1}>
+                <Box flexShrink={1}>{kopf(s, lage, breite - 11)}</Box>
+                <Button
+                  key={`oeffnen-${s.id}`}
+                  label="Öffnen"
+                  variant={lage === 'frage' || lage === 'freigabe' ? 'primary' : 'secondary'}
+                  onPress={() => void springen($, s.hostId)}
+                />
+              </Box>
+            ) : (
+              kopf(s, lage, breite)
+            )}
             <Text dimColor>
               {kuerzen(
-                `  ${zustandVon(s, lage, r.gelesen)}${s.modell ? ` · ${modellKurz(s.modell)}` : ''}`,
+                `  ${zustandVon(s, lage, r.gelesen)}${s.titel ? ` · ${herkunftVon(s)}` : ''}${s.modell ? ` · ${modellKurz(s.modell)}` : ''}`,
                 breite,
               )}
             </Text>
+            {abschnittVon(s, breite).map(z => (
+              <Text dimColor>{z}</Text>
+            ))}
             {r.zeigeAuftrag !== false && s.auftrag && (
               <Text dimColor>{kuerzen(`  „${s.auftrag}“`, breite)}</Text>
             )}
