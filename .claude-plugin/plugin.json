@@ -1,0 +1,49 @@
+{
+  "name": "sitzungsradar",
+  "displayName": "Sitzungsradar",
+  "version": "0.1.0",
+  "description": "Panel mit allen gerade laufenden Claude-Code-Sitzungen über alle Projekte: wer arbeitet, wer auf dich wartet, welches Werkzeug gerade läuft.",
+  "author": {
+    "name": "BuildMySoftware"
+  },
+  "homepage": "https://buildmysoftware.de",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "sitzungen",
+    "panel",
+    "uebersicht",
+    "einsteiger",
+    "deutsch"
+  ],
+  "network": {
+    "hosts": []
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "zeige_auftrag": {
+      "type": "boolean",
+      "title": "Letzten Auftrag zeigen",
+      "description": "Zeigt unter jeder Sitzung den Anfang deiner letzten Eingabe. Bleibt nur auf diesem Rechner.",
+      "default": true
+    },
+    "ruhig_ab_minuten": {
+      "type": "number",
+      "title": "Ruhig ab (Minuten)",
+      "description": "Wartet eine Sitzung länger als so viele Minuten auf dich, wird sie blass gezeigt.",
+      "default": 15
+    },
+    "beim_start_oeffnen": {
+      "type": "boolean",
+      "title": "Panel beim Start öffnen",
+      "description": "Öffnet das Panel in jeder neuen Sitzung, wenn Platz ist. Sonst nur mit /sitzungsradar.",
+      "default": true
+    },
+    "ordner": {
+      "type": "string",
+      "title": "Ordner für die Herzschläge",
+      "description": "Leer lassen für ~/.claude/sitzungsradar. Alle Sitzungen müssen denselben Ordner nutzen.",
+      "default": ""
+    }
+  }
+}

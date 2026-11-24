@@ -1,0 +1,14 @@
+{
+  "name": "sitzungsradar",
+  "description": "Sitzungsradar von BuildMySoftware: alle laufenden Claude-Code-Sitzungen in einem Panel.",
+  "owner": {
+    "name": "BuildMySoftware"
+  },
+  "plugins": [
+    {
+      "name": "sitzungsradar",
+      "source": "./",
+      "description": "Panel mit allen gerade laufenden Claude-Code-Sitzungen über alle Projekte."
+    }
+  ]
+}
