@@ -25,6 +25,8 @@ export type Herzschlag = {
   abschnitt?: string
   /** Laufender Schritt der Aufgabenliste; `fertig`, wenn alle erledigt sind. */
   schritt?: { text: string; nr: number; von: number; fertig?: boolean }
+  /** Erster Satz der letzten Abschluss-Zusammenfassung: der Status in der Seitenleiste der App. */
+  stand?: string
   /** Kennung der Sitzung in der Desktop-App, für den Sprung hinein. */
   hostId?: string
 }

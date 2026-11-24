@@ -1,7 +1,7 @@
 {
   "name": "sitzungsradar",
   "displayName": "Sitzungsradar",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Panel mit allen gerade laufenden Claude-Code-Sitzungen über alle Projekte: Name, Abschnitt und Schritt jeder Sitzung, wer auf dich wartet, und ein Knopf, mit dem du in die Sitzung springst.",
   "author": {
     "name": "BuildMySoftware"

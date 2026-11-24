@@ -5,6 +5,7 @@ import type { Herzschlag } from '../types'
 import {
   abschnittVon,
   dauer,
+  ersterSatz,
   kopfVon,
   lageVon,
   ordnen,
@@ -320,8 +321,14 @@ test('die eigene Sitzung liest Titel, Kapitel und Schritt aus ihrem Protokoll, o
   eigen = eigenVon(dateien)
   expect(eigen.schritt).toEqual({ text: 'Veröffentlichen', nr: 3, von: 3 })
 
-  await $.tool.call({ tool: ABSCHLUSS, recap: 'fertig', tool_use_id: 'toolu_5' } as never)
-  expect(eigenVon(dateien).schritt).toEqual({ text: '', nr: 3, von: 3, fertig: true })
+  await $.tool.call({
+    tool: ABSCHLUSS,
+    recap: 'Die Seite ist veröffentlicht. Nichts committet.',
+    tool_use_id: 'toolu_5',
+  } as never)
+  eigen = eigenVon(dateien)
+  expect(eigen.schritt).toEqual({ text: '', nr: 3, von: 3, fertig: true })
+  expect(eigen.stand).toBe('Die Seite ist veröffentlicht.')
 })
 
 test('Aufgabenliste, Schritt und Abschnittszeilen', () => {
@@ -344,6 +351,13 @@ test('Aufgabenliste, Schritt und Abschnittszeilen', () => {
   expect(schrittVon(s.plan)).toEqual({ text: 'Eins', nr: 1, von: 3 })
   s = spurWeiter(s, ABSCHLUSS, {})
   expect(schrittVon(s.plan)).toEqual({ text: '', nr: 3, von: 3, fertig: true })
+  expect(s.stand).toBe(undefined)
+  s = spurWeiter(s, ABSCHLUSS, { recap: 'Version 1.2 ist live!  Offen: Doku.' })
+  expect(s.stand).toBe('Version 1.2 ist live!')
+  expect(spurWeiter(s, ABSCHLUSS, { recap: '' }).stand).toBe('Version 1.2 ist live!')
+  expect(spurWeiter({}, ABSCHLUSS, { recap: 'Nur Stand.' })).toEqual({ stand: 'Nur Stand.' })
+  expect(ersterSatz('Stand 1.2.3 ist da. Rest')).toBe('Stand 1.2.3 ist da.')
+  expect(ersterSatz(42)).toBe('')
   s = spurWeiter(s, KAPITEL, { title: '  Tests\n und Prüfung ' })
   expect(s.abschnitt).toBe('Tests und Prüfung')
   expect(spurWeiter(s, KAPITEL, { title: '' }).abschnitt).toBe('Tests und Prüfung')
@@ -363,4 +377,9 @@ test('Aufgabenliste, Schritt und Abschnittszeilen', () => {
     '  Plan erledigt (4/4)',
   ])
   expect(abschnittVon(schlag({ id: 'y', projekt: 'P' }), 60)).toEqual([])
+  // Läuft kein Schritt, steht der Statussatz da; ein laufender Schritt geht ihm vor.
+  const fertig = { ...h, schritt: { text: '', nr: 4, von: 4, fertig: true }, stand: 'Seite ist live.' }
+  expect(abschnittVon(fertig, 60)).toEqual(['  Abschnitt: Umsetzung · Stand: Seite ist live.'])
+  expect(abschnittVon({ ...h, stand: 'Seite ist live.' }, 60)).toEqual(['  Abschnitt: Umsetzung · Schritt 2/4: Tests'])
+  expect(abschnittVon(schlag({ id: 'z', projekt: 'P', stand: 'Nur Stand.' }), 60)).toEqual(['  Stand: Nur Stand.'])
 })

@@ -142,7 +142,10 @@ export const abschnittVon = (h: Herzschlag, breite: number): string[] => {
   const teile: string[] = []
   if (h.abschnitt) teile.push(`Abschnitt: ${h.abschnitt}`)
   const s = h.schritt
-  if (s) teile.push(s.fertig ? `Plan erledigt (${s.von}/${s.von})` : `Schritt ${s.nr}/${s.von}: ${s.text}`)
+  // Läuft kein Schritt, sagt der Statussatz aus der Seitenleiste der App mehr als „Plan erledigt“.
+  if (s && !s.fertig) teile.push(`Schritt ${s.nr}/${s.von}: ${s.text}`)
+  else if (h.stand) teile.push(`Stand: ${h.stand}`)
+  else if (s) teile.push(`Plan erledigt (${s.von}/${s.von})`)
   if (teile.length === 0) return []
   const eine = `  ${teile.join(' · ')}`
   if (eine.length <= breite || teile.length === 1) return [kuerzen(eine, breite)]
@@ -152,10 +155,13 @@ export const abschnittVon = (h: Herzschlag, breite: number): string[] => {
 // ---- Kapitel und Aufgabenliste -------------------------------------------------------
 
 type Punkt = { text: string; status: 'pending' | 'in_progress' | 'completed' }
-export type Spur = { abschnitt?: string; plan?: Punkt[] }
+export type Spur = { abschnitt?: string; plan?: Punkt[]; stand?: string }
 type Aufruf = { id: string; tool: string; a: Record<string, unknown> }
 
 const zeile = (v: unknown) => (typeof v === 'string' ? kuerzen(einzeilig(v), TEXT_LAENGE) : '')
+/** Der erste Satz: den zeigt die App als Status in ihrer Seitenleiste. */
+export const ersterSatz = (v: unknown) =>
+  typeof v === 'string' ? zeile(einzeilig(v).split(/(?<=[.!?])\s/)[0]) : ''
 
 /** Wendet einen Aufruf von Kapitel, Aufgabenliste oder Abschluss an, so wie die App ihn liest. */
 export function spurWeiter(s: Spur, tool: string, a: Record<string, unknown>): Spur {
@@ -163,8 +169,11 @@ export function spurWeiter(s: Spur, tool: string, a: Record<string, unknown>): S
     const t = zeile(a.title)
     return t ? { ...s, abschnitt: t } : s
   }
-  if (tool === ABSCHLUSS)
-    return s.plan ? { ...s, plan: s.plan.map(p => ({ ...p, status: 'completed' })) } : s
+  if (tool === ABSCHLUSS) {
+    const stand = ersterSatz(a.recap) || s.stand
+    const plan = s.plan?.map(p => ({ ...p, status: 'completed' as const }))
+    return { ...s, ...(plan ? { plan } : {}), ...(stand ? { stand } : {}) }
+  }
   if (tool !== PLAN) return s
   let plan: Punkt[] = (s.plan ?? []).map(p => ({ ...p }))
   if (Array.isArray(a.items))
@@ -378,11 +387,11 @@ async function protokollLesenJetzt($: Api) {
 /** Nie zwei Blicke gleichzeitig; danach den Herzschlag schreiben, wenn sich etwas geändert hat. */
 function protokollLesen($: Api) {
   if (protokollLaeuft) return protokollLaeuft
-  const vorher = JSON.stringify([titel, spur.abschnitt, schrittVon(spur.plan)])
+  const vorher = JSON.stringify([titel, spur.abschnitt, spur.stand, schrittVon(spur.plan)])
   protokollLaeuft = protokollLesenJetzt($)
     .catch(() => {})
     .then(async () => {
-      if (JSON.stringify([titel, spur.abschnitt, schrittVon(spur.plan)]) !== vorher) await schreiben($)
+      if (JSON.stringify([titel, spur.abschnitt, spur.stand, schrittVon(spur.plan)]) !== vorher) await schreiben($)
     })
     .finally(() => {
       protokollLaeuft = undefined
@@ -470,6 +479,7 @@ async function schreibenJetzt($: Api, aenderung: Partial<Herzschlag>) {
     titel,
     abschnitt: spur.abschnitt,
     schritt: schrittVon(spur.plan),
+    stand: spur.stand,
     werkzeug: werkzeugJetzt(),
     zuletzt: jetzt,
   }

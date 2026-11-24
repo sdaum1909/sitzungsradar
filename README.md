@@ -25,7 +25,7 @@ Sitzungsradar
 
 ○ Blog-Layout  (diese Sitzung)
   wartet auf dich seit 2 min · website › blog · opus-5-5
-  Plan erledigt (5/5)
+  Abschnitt: Feinschliff · Stand: Das neue Layout ist online.
 
 · notizen
   ruhig seit 40 min · haiku-5-5
@@ -37,7 +37,8 @@ Jeder Eintrag zeigt:
   `/rename` gesetzt hast); dahinter Projekt › Zweig, damit du auch gleich benannte Sitzungen auseinanderhältst.
   Hat eine Sitzung noch keinen Namen, steht dort Projekt › Zweig.
 - **den Abschnitt**: das Kapitel, in dem Claude gerade arbeitet, und den laufenden Schritt der Aufgabenliste
-  („Schritt 2/5: Tests schreiben“). Ist die Liste abgehakt, steht dort „Plan erledigt“.
+  („Schritt 2/5: Tests schreiben“). Läuft kein Schritt, steht dort der Stand der Sitzung: der Satz, den
+  die App als Status in ihrer Seitenleiste zeigt.
 - **den Knopf „Öffnen“**: ein Druck, und die Desktop-App springt in diese Sitzung, damit du dort
   weitermachst. Braucht die Sitzung dich, ist der Knopf hervorgehoben.
 
@@ -59,7 +60,7 @@ Jede Sitzung, in der das Sitzungsradar läuft, schreibt alle 20 Sekunden und bei
 Jedes Panel liest diesen Ordner alle 5 Sekunden. Beendete Sitzungen verschwinden sofort,
 abgestürzte nach drei Minuten Stille. Alte Dateien räumt das Radar selbst weg.
 
-Name, Kapitel und Schritt liest jede Sitzung aus ihrem eigenen Protokoll, beim Start einmal von hinten
+Name, Kapitel, Schritt und Stand liest jede Sitzung aus ihrem eigenen Protokoll, beim Start einmal von hinten
 und danach nur die neuen Zeilen. Wechselt sie das Kapitel oder hakt einen Schritt ab, steht das sofort
 in ihrer Datei.
 
@@ -102,11 +103,11 @@ jede Einstellung hat einen Standardwert. Ändern kannst du sie jederzeit (siehe 
 
 Alles bleibt auf deinem Rechner. Das Sitzungsradar sendet nichts ins Netz und ruft kein Modell auf.
 In den Dateien stehen Projektname, Ordner, Modell, Zustand, das laufende Werkzeug, der Name der Sitzung,
-ihr Kapitel und Schritt (je höchstens 80 Zeichen), die Kennung für den Sprung und, wenn du es
+ihr Kapitel, Schritt und Stand (je höchstens 80 Zeichen), die Kennung für den Sprung und, wenn du es
 nicht abschaltest, die ersten 140 Zeichen deiner letzten Eingabe. Schalte „Letzten Auftrag zeigen“
 aus, wenn du das nicht willst; dann schreibt das Radar die Eingabe auch nicht mehr in die Datei.
-Für Name, Kapitel und Schritt liest jede Sitzung ihr eigenes Protokoll auf deinem Rechner und übernimmt
-daraus nur diese drei Angaben.
+Für Name, Kapitel, Schritt und Stand liest jede Sitzung ihr eigenes Protokoll auf deinem Rechner und
+übernimmt daraus nur diese Angaben.
 
 ## Grenzen
 
@@ -115,8 +116,9 @@ daraus nur diese drei Angaben.
 - Sitzungen ohne Sitzungsradar sieht das Panel nicht.
 - Der Knopf „Öffnen“ springt nur in Sitzungen der Claude-Desktop-App. Geprüft auf macOS; unter Windows
   ist der Weg eingebaut, aber noch nicht getestet.
-- Kapitel und Aufgabenliste führt die Desktop-App. In einer Terminal-Sitzung siehst du Projekt und Zustand,
-  einen Namen erst nach `/rename`.
+- Kapitel, Aufgabenliste und Stand führt die Desktop-App. In einer Terminal-Sitzung siehst du Projekt und
+  Zustand, einen Namen erst nach `/rename`. Setzt eine Sitzung weder Kapitel noch Aufgabenliste, bleibt
+  ihre Abschnittszeile leer.
 
 ## Lizenz
 
