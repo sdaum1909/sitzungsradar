@@ -64,6 +64,9 @@ mit `sdaum1909/sitzungsradar` → **Plugin hinzufügen**.
 Danach öffnet sich das Panel in jeder neuen Sitzung von selbst, wenn Platz ist.
 Sonst holst du es mit `/sitzungsradar`.
 
+Meldet die Installation „4 userConfig options not yet set“, kannst du das übergehen:
+jede Einstellung hat einen Standardwert. Ändern kannst du sie jederzeit (siehe unten).
+
 ## Einstellungen
 
 | Einstellung | Standard | Wirkung |
