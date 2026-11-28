@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Sicherheitslücke vertraulich melden
+    url: https://github.com/sdaum1909/sitzungsradar/security/advisories/new
+    about: Bitte nicht öffentlich, sondern über die vertrauliche Meldung von GitHub.
+  - name: Anleitung lesen
+    url: https://github.com/sdaum1909/sitzungsradar#readme
+    about: Installieren, Einstellungen, Aktualisieren und Entfernen.

@@ -7,11 +7,14 @@
     "name": "BuildMySoftware"
   },
   "homepage": "https://buildmysoftware.de",
+  "repository": "https://github.com/sdaum1909/sitzungsradar",
   "license": "MIT",
   "keywords": [
     "claude-code",
     "sitzungen",
+    "sessions",
     "panel",
+    "dashboard",
     "uebersicht",
     "einsteiger",
     "deutsch"

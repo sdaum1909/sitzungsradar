@@ -1,0 +1,17 @@
+name: Idee oder Wunsch
+description: Etwas fehlt dir am Sitzungsradar.
+labels: ["idee"]
+body:
+  - type: textarea
+    id: wunsch
+    attributes:
+      label: Was möchtest du sehen oder tun können?
+      description: Beschreib die Lage, in der es dir fehlt. Eine Lösung musst du nicht mitbringen.
+    validations:
+      required: true
+  - type: textarea
+    id: heute
+    attributes:
+      label: Wie hilfst du dir heute?
+    validations:
+      required: false

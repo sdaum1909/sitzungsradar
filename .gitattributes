@@ -1,0 +1,7 @@
+# Zeilenenden einheitlich, auch wenn jemand unter Windows mitarbeitet
+* text=auto eol=lf
+
+# Nicht im Download-Paket (git archive): nur für GitHub und die Entwicklung
+.github          export-ignore
+.gitattributes   export-ignore
+.gitignore       export-ignore

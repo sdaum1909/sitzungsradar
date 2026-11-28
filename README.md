@@ -1,4 +1,10 @@
+<img src=".claude-plugin/icon.png" alt="" width="96" height="96" align="right">
+
 # Sitzungsradar
+
+[![Version](https://img.shields.io/github/v/release/sdaum1909/sitzungsradar?label=Version)](https://github.com/sdaum1909/sitzungsradar/releases/latest)
+[![Lizenz: MIT](https://img.shields.io/badge/Lizenz-MIT-blue)](LICENSE)
+![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-d97757)
 
 Ein Panel für Claude Code, das dir alle gerade laufenden Sitzungen zeigt, über alle Projekte hinweg.
 Wer mit Claude anfängt, hat schnell drei, vier Sitzungen offen und verliert den Überblick: Welche
@@ -6,13 +12,16 @@ arbeitet noch? Welche wartet seit zehn Minuten auf mich? Wo hängt eine Freigabe
 beantwortet das auf einen Blick, im Terminal und in der Desktop-App. Jede Sitzung steht mit ihrem
 Namen da, mit dem Abschnitt, in dem sie gerade arbeitet, und mit einem Knopf, der dich direkt hineinbringt.
 
-Ein Werkzeug von [BuildMySoftware](https://buildmysoftware.de).
+Ohne Kosten, ohne Konto, Quelltext offen unter MIT-Lizenz. Ein Werkzeug von
+[BuildMySoftware](https://buildmysoftware.de).
+
+*English summary [below](#in-english).*
 
 ## Was du siehst
 
 ```
 Sitzungsradar
-4 Sitzungen · 1 braucht dich · 2 warten · 1 arbeitet
+4 Sitzungen · 1 braucht dich · 1 wartet · 1 arbeitet
 
 ◆ Anmeldeseite bauen                              [ Öffnen ]
   fragt dich (AskUserQuestion) · shop-relaunch › login · opus-5-5
@@ -30,6 +39,8 @@ Sitzungsradar
 · notizen
   ruhig seit 40 min · haiku-5-5
 ```
+
+*Beispiel mit erfundenen Projekten.*
 
 Jeder Eintrag zeigt:
 
@@ -53,21 +64,14 @@ Oben steht die Zusammenfassung, dazu kommt eine kurze Zeile in der Statusleiste 
 Wer dich braucht, steht immer oben. `/sitzungsradar` schreibt dieselbe Übersicht in den Chat, mit dem Link
 zum Öffnen unter jeder Sitzung.
 
-## So funktioniert es
+## Voraussetzungen
 
-Jede Sitzung, in der das Sitzungsradar läuft, schreibt alle 20 Sekunden und bei jedem Wechsel
-(Auftrag gestartet, Werkzeug läuft, fertig) eine kleine Datei nach `~/.claude/sitzungsradar/`.
-Jedes Panel liest diesen Ordner alle 5 Sekunden. Beendete Sitzungen verschwinden sofort,
-abgestürzte nach drei Minuten Stille. Alte Dateien räumt das Radar selbst weg.
-
-Name, Kapitel, Schritt und Stand liest jede Sitzung aus ihrem eigenen Protokoll, beim Start einmal von hinten
-und danach nur die neuen Zeilen. Wechselt sie das Kapitel oder hakt einen Schritt ab, steht das sofort
-in ihrer Datei.
-
-Darum siehst du nur Sitzungen, in denen das Sitzungsradar installiert ist. Am einfachsten installierst
-du es einmal für deinen Benutzer, dann ist es in jeder Sitzung dabei.
+- Claude Code im Terminal oder in der Claude-Desktop-App. Getestet mit Claude Code 2.1.331 auf macOS.
+- Sonst nichts: keine Abhängigkeiten, kein Netzzugang, kein Konto.
 
 ## Installieren
+
+### Weg 1: direkt aus GitHub (empfohlen, mit Updates)
 
 In einer Terminal-Sitzung von Claude Code, an der Eingabe:
 
@@ -84,30 +88,104 @@ claude plugin install sitzungsradar --marketplace sdaum1909/sitzungsradar
 In der Claude-Desktop-App: neben dem Eingabefeld auf **+** → **Plugins** → **Marketplace hinzufügen**
 mit `sdaum1909/sitzungsradar` → **Plugin hinzufügen**.
 
-Danach öffnet sich das Panel in jeder neuen Sitzung von selbst, wenn Platz ist.
-Sonst holst du es mit `/sitzungsradar`.
+### Weg 2: als Download
+
+Für Rechner ohne GitHub-Zugang, zum Prüfen vor dem Einsatz oder zum Weitergeben im Team.
+
+1. Lade [`sitzungsradar.zip`](https://github.com/sdaum1909/sitzungsradar/releases/latest/download/sitzungsradar.zip)
+   und [`SHA256SUMS.txt`](https://github.com/sdaum1909/sitzungsradar/releases/latest/download/SHA256SUMS.txt)
+   aus dem [neuesten Release](https://github.com/sdaum1909/sitzungsradar/releases/latest) in denselben Ordner.
+2. Prüfe die Datei. Die Ausgabe muss `sitzungsradar.zip: OK` lauten:
+
+   ```bash
+   shasum -a 256 -c SHA256SUMS.txt
+   ```
+
+   Unter Windows (PowerShell) vergleichst du den Wert von
+   `Get-FileHash sitzungsradar.zip -Algorithm SHA256` mit der Zeile in `SHA256SUMS.txt`.
+3. Entpacke das Archiv. Es enthält einen Ordner `sitzungsradar-<Version>`.
+4. Installiere aus diesem Ordner:
+
+   ```bash
+   claude plugin install sitzungsradar --marketplace ./sitzungsradar-0.2.1
+   ```
+
+Claude Code kopiert das Plugin beim Installieren. Den entpackten Ordner kannst du danach löschen.
+Updates kommen auf diesem Weg nicht von selbst; für eine neue Version lädst du das neue Archiv
+und installierst es ebenso.
+
+### Nach der Installation
+
+Starte eine neue Sitzung. Das Panel öffnet sich dann von selbst, wenn Platz ist. Sonst holst du es
+mit `/sitzungsradar`.
+
+Das Radar sieht nur Sitzungen, in denen es selbst läuft. Beide Wege installieren es für deinen
+Benutzer, damit ist es in jeder Sitzung dabei.
 
 Meldet die Installation „4 userConfig options not yet set“, kannst du das übergehen:
-jede Einstellung hat einen Standardwert. Ändern kannst du sie jederzeit (siehe unten).
+jede Einstellung hat einen Standardwert.
 
 ## Einstellungen
 
-| Einstellung | Standard | Wirkung |
-|---|---|---|
-| Letzten Auftrag zeigen | an | Zeigt unter jeder Sitzung den Anfang deiner letzten Eingabe |
-| Ruhig ab (Minuten) | 15 | Ab wann eine wartende Sitzung blass gezeigt wird |
-| Panel beim Start öffnen | an | Öffnet das Panel in jeder neuen Sitzung |
-| Ordner für die Herzschläge | leer | Leer heißt `~/.claude/sitzungsradar`; alle Sitzungen müssen denselben Ordner nutzen |
+| Schlüssel | Einstellung | Standard | Wirkung |
+|---|---|---|---|
+| `zeige_auftrag` | Letzten Auftrag zeigen | an | Zeigt unter jeder Sitzung den Anfang deiner letzten Eingabe |
+| `ruhig_ab_minuten` | Ruhig ab (Minuten) | 15 | Ab wann eine wartende Sitzung blass gezeigt wird |
+| `beim_start_oeffnen` | Panel beim Start öffnen | an | Öffnet das Panel in jeder neuen Sitzung |
+| `ordner` | Ordner für die Herzschläge | leer | Leer heißt `~/.claude/sitzungsradar`; alle Sitzungen müssen denselben Ordner nutzen |
+
+Ändern kannst du sie jederzeit in Claude Code mit `/plugin configure sitzungsradar@sitzungsradar`,
+oder aus einer Shell:
+
+```bash
+echo '{"ruhig_ab_minuten": "30"}' | claude plugin configure sitzungsradar@sitzungsradar --values-stdin
+```
+
+Die Änderung gilt ab der nächsten Sitzung.
+
+## Aktualisieren und entfernen
+
+```bash
+claude plugin marketplace update sitzungsradar
+claude plugin update sitzungsradar@sitzungsradar
+```
+
+Das Update gilt ab der nächsten Sitzung. Was sich je Version geändert hat, steht im [CHANGELOG](CHANGELOG.md).
+
+Entfernen:
+
+```bash
+claude plugin uninstall sitzungsradar@sitzungsradar
+claude plugin marketplace remove sitzungsradar
+```
+
+Der Ordner `~/.claude/sitzungsradar/` mit den Herzschlag-Dateien bleibt dabei stehen. Du kannst ihn
+danach von Hand löschen.
+
+## So funktioniert es
+
+Jede Sitzung, in der das Sitzungsradar läuft, schreibt alle 20 Sekunden und bei jedem Wechsel
+(Auftrag gestartet, Werkzeug läuft, fertig) eine kleine Datei nach `~/.claude/sitzungsradar/`.
+Jedes Panel liest diesen Ordner alle 5 Sekunden. Beendete Sitzungen verschwinden sofort,
+abgestürzte nach drei Minuten Stille. Alte Dateien räumt das Radar selbst weg.
+
+Name, Kapitel, Schritt und Stand liest jede Sitzung aus ihrem eigenen Protokoll, beim Start einmal von hinten
+und danach nur die neuen Zeilen. Wechselt sie das Kapitel oder hakt einen Schritt ab, steht das sofort
+in ihrer Datei.
 
 ## Datenschutz
 
-Alles bleibt auf deinem Rechner. Das Sitzungsradar sendet nichts ins Netz und ruft kein Modell auf.
+Alles bleibt auf deinem Rechner. Das Sitzungsradar sendet nichts ins Netz und ruft kein Modell auf;
+das Manifest gibt ihm keinen einzigen Netzwerk-Host frei (`"network": { "hosts": [] }`).
 In den Dateien stehen Projektname, Ordner, Modell, Zustand, das laufende Werkzeug, der Name der Sitzung,
 ihr Kapitel, Schritt und Stand (je höchstens 80 Zeichen), die Kennung für den Sprung und, wenn du es
 nicht abschaltest, die ersten 140 Zeichen deiner letzten Eingabe. Schalte „Letzten Auftrag zeigen“
 aus, wenn du das nicht willst; dann schreibt das Radar die Eingabe auch nicht mehr in die Datei.
 Für Name, Kapitel, Schritt und Stand liest jede Sitzung ihr eigenes Protokoll auf deinem Rechner und
 übernimmt daraus nur diese Angaben.
+
+Lies den Quelltext, bevor du ein Plugin installierst. Das gilt für jedes Plugin, auch für dieses.
+Das ganze Verhalten steht in [`hooks/register.tsx`](hooks/register.tsx).
 
 ## Grenzen
 
@@ -119,7 +197,34 @@ Für Name, Kapitel, Schritt und Stand liest jede Sitzung ihr eigenes Protokoll a
 - Kapitel, Aufgabenliste und Stand führt die Desktop-App. In einer Terminal-Sitzung siehst du Projekt und
   Zustand, einen Namen erst nach `/rename`. Setzt eine Sitzung weder Kapitel noch Aufgabenliste, bleibt
   ihre Abschnittszeile leer.
+- Die Oberfläche ist deutsch.
+
+## Fehler melden und mitmachen
+
+- Fehler und Wünsche: [Issue anlegen](https://github.com/sdaum1909/sitzungsradar/issues/new/choose).
+  Nenne die Version von Claude Code (`claude --version`), dein System und ob du im Terminal oder in der
+  Desktop-App arbeitest.
+- Sicherheitslücken bitte nicht öffentlich, sondern wie in [SECURITY.md](SECURITY.md) beschrieben.
+- Selbst prüfen: `claude plugin validate .` und `claude plugin test .` im Ordner des Plugins.
+  Die Tests stehen in [`hooks/sitzungsradar.test.tsx`](hooks/sitzungsradar.test.tsx).
+
+## In English
+
+**Sitzungsradar** ("session radar") is a free, open-source (MIT) plugin for Claude Code. It adds a panel
+that lists every running Claude Code session across all your projects: its name, the chapter and
+task-list step it is working on, and whether it is working (●), waiting for you (○), needs you (◆: a
+question, or a tool running for over a minute, usually a pending permission) or idle (·). An **Öffnen**
+("open") button jumps straight into that session in the Claude desktop app. Everything stays on your
+machine: no network access, no model calls. The interface is in German.
+
+```bash
+claude plugin install sitzungsradar --marketplace sdaum1909/sitzungsradar
+```
+
+Or download `sitzungsradar.zip` from the [latest release](https://github.com/sdaum1909/sitzungsradar/releases/latest),
+verify it with `shasum -a 256 -c SHA256SUMS.txt`, unzip it and run
+`claude plugin install sitzungsradar --marketplace ./sitzungsradar-<version>`.
 
 ## Lizenz
 
-MIT, siehe [LICENSE](LICENSE). © 1000deals.de GmbH · BuildMySoftware
+MIT, siehe [LICENSE](LICENSE). © 2026 1000deals.de GmbH · [BuildMySoftware](https://buildmysoftware.de)

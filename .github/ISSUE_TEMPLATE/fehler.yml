@@ -1,0 +1,66 @@
+name: Fehler melden
+description: Etwas funktioniert nicht so, wie es in der Anleitung steht.
+labels: ["fehler"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke, dass du dir die Zeit nimmst. Bitte keine Sicherheitslücken hier melden,
+        dafür gibt es die vertrauliche Meldung unter **Security → Report a vulnerability**.
+        Füge keine Inhalte aus deinen Sitzungen ein, die andere nicht sehen sollen.
+  - type: input
+    id: version
+    attributes:
+      label: Version des Sitzungsradars
+      description: Steht in `claude plugin list` oder in `.claude-plugin/plugin.json`.
+      placeholder: "0.2.1"
+    validations:
+      required: true
+  - type: input
+    id: claude
+    attributes:
+      label: Version von Claude Code
+      description: Ausgabe von `claude --version`.
+      placeholder: "2.1.331"
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: System
+      options:
+        - macOS
+        - Windows
+        - Linux
+    validations:
+      required: true
+  - type: dropdown
+    id: oberflaeche
+    attributes:
+      label: Wo läuft Claude Code?
+      multiple: true
+      options:
+        - Terminal
+        - Claude-Desktop-App
+        - VS Code
+        - anderswo
+    validations:
+      required: true
+  - type: textarea
+    id: ablauf
+    attributes:
+      label: Was ist passiert?
+      description: Was hast du getan, was hast du erwartet, was kam stattdessen?
+      placeholder: |
+        1. …
+        2. …
+        Erwartet: …
+        Stattdessen: …
+    validations:
+      required: true
+  - type: textarea
+    id: ausgabe
+    attributes:
+      label: Meldungen (optional)
+      description: Ausgabe von `claude plugin validate` oder eine Fehlerzeile aus dem Chat, falls vorhanden.
+      render: text

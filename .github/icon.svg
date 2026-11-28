@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="sweep" x1="512" y1="512" x2="700" y2="190" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A4480A" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#C85A12" stop-opacity="0.85"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="#15181F"/>
+  <g fill="none" stroke="#F3F1EC" stroke-opacity="0.28" stroke-width="16">
+    <circle cx="512" cy="512" r="340"/>
+    <circle cx="512" cy="512" r="230"/>
+    <circle cx="512" cy="512" r="120"/>
+  </g>
+  <path d="M512 512 L512 172 A340 340 0 0 1 806.4 342 Z" fill="url(#sweep)"/>
+  <line x1="512" y1="512" x2="806.4" y2="342" stroke="#F08A3C" stroke-width="16" stroke-linecap="round"/>
+  <!-- ◆ braucht dich -->
+  <rect x="604" y="284" width="80" height="80" rx="10" fill="#F08A3C" transform="rotate(45 644 324)"/>
+  <!-- ● arbeitet -->
+  <circle cx="396" cy="832" r="46" fill="#F3F1EC"/>
+  <!-- ○ wartet -->
+  <circle cx="711" cy="627" r="38" fill="#15181F" stroke="#F3F1EC" stroke-width="16"/>
+  <!-- · ruhig -->
+  <circle cx="399" cy="471" r="20" fill="#F3F1EC" fill-opacity="0.55"/>
+  <circle cx="512" cy="512" r="24" fill="#F3F1EC"/>
+</svg>
