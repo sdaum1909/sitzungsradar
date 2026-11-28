@@ -103,16 +103,29 @@ Für Rechner ohne GitHub-Zugang, zum Prüfen vor dem Einsatz oder zum Weitergebe
 
    Unter Windows (PowerShell) vergleichst du den Wert von
    `Get-FileHash sitzungsradar.zip -Algorithm SHA256` mit der Zeile in `SHA256SUMS.txt`.
-3. Entpacke das Archiv. Es enthält einen Ordner `sitzungsradar-<Version>`.
-4. Installiere aus diesem Ordner:
+3. Entpacke das Archiv an einen festen Platz, zum Beispiel nach `~/claude-plugins`, und installiere
+   von dort. Das Archiv enthält einen Ordner `sitzungsradar`:
 
    ```bash
-   claude plugin install sitzungsradar --marketplace ./sitzungsradar-0.2.1
+   unzip sitzungsradar.zip -d ~/claude-plugins
+   claude plugin install sitzungsradar --marketplace ~/claude-plugins/sitzungsradar
    ```
 
-Claude Code kopiert das Plugin beim Installieren. Den entpackten Ordner kannst du danach löschen.
-Updates kommen auf diesem Weg nicht von selbst; für eine neue Version lädst du das neue Archiv
-und installierst es ebenso.
+   Unter Windows (PowerShell, noch nicht getestet):
+
+   ```powershell
+   Expand-Archive sitzungsradar.zip -DestinationPath $HOME\claude-plugins
+   claude plugin install sitzungsradar --marketplace $HOME\claude-plugins\sitzungsradar
+   ```
+
+**Lass den Ordner stehen.** Claude Code liest das Plugin bei jedem Start aus diesem Ordner. Fehlt er,
+meldet `claude plugin list` „failed to load“. Hast du ihn verschoben oder gelöscht, entfernst du den
+alten Eintrag mit `claude plugin marketplace remove sitzungsradar` und wiederholst Schritt 3.
+
+Updates kommen auf diesem Weg nicht von selbst. Für eine neue Version lädst und prüfst du das neue
+Archiv, entpackst es an denselben Platz (`unzip -o sitzungsradar.zip -d ~/claude-plugins`, unter
+Windows `Expand-Archive … -Force`) und führst die beiden Befehle unter
+[Aktualisieren](#aktualisieren-und-entfernen) aus.
 
 ### Nach der Installation
 
@@ -159,8 +172,8 @@ claude plugin uninstall sitzungsradar@sitzungsradar
 claude plugin marketplace remove sitzungsradar
 ```
 
-Der Ordner `~/.claude/sitzungsradar/` mit den Herzschlag-Dateien bleibt dabei stehen. Du kannst ihn
-danach von Hand löschen.
+Der Ordner `~/.claude/sitzungsradar/` mit den Herzschlag-Dateien bleibt dabei stehen, beim Download-Weg
+auch `~/claude-plugins/sitzungsradar/`. Beide kannst du danach von Hand löschen.
 
 ## So funktioniert es
 
@@ -222,8 +235,10 @@ claude plugin install sitzungsradar --marketplace sdaum1909/sitzungsradar
 ```
 
 Or download `sitzungsradar.zip` from the [latest release](https://github.com/sdaum1909/sitzungsradar/releases/latest),
-verify it with `shasum -a 256 -c SHA256SUMS.txt`, unzip it and run
-`claude plugin install sitzungsradar --marketplace ./sitzungsradar-<version>`.
+verify it with `shasum -a 256 -c SHA256SUMS.txt`, unzip it to a permanent place and install from there:
+`unzip sitzungsradar.zip -d ~/claude-plugins`, then
+`claude plugin install sitzungsradar --marketplace ~/claude-plugins/sitzungsradar`.
+Keep that folder: Claude Code loads the plugin from it on every start.
 
 ## Lizenz
 

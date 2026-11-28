@@ -4,6 +4,17 @@ Alle nennenswerten Änderungen am Sitzungsradar. Die Versionsnummern folgen
 [Semantic Versioning](https://semver.org/lang/de/); die Fassung im Manifest
 (`.claude-plugin/plugin.json`) und der Git-Tag stimmen immer überein.
 
+## [0.2.2] – 2026-11-28
+
+### Behoben
+- Download-Weg: Die Anleitung zu 0.2.1 sagte, der entpackte Ordner dürfe nach der Installation weg.
+  Claude Code lädt das Plugin aber bei jedem Start aus diesem Ordner; ohne ihn meldet es „failed to load“.
+  Jetzt steht in der Anleitung: an einen festen Platz entpacken und den Ordner stehen lassen.
+- Das Archiv entpackt in einen Ordner `sitzungsradar` ohne Versionsnummer. So geht ein Update an
+  denselben Platz, und `claude plugin update` übernimmt es.
+
+Am Code des Plugins hat sich nichts geändert.
+
 ## [0.2.1] – 2026-11-24
 
 ### Geändert
@@ -35,6 +46,7 @@ Alle nennenswerten Änderungen am Sitzungsradar. Die Versionsnummern folgen
 - Kurzzeile in der Statusleiste und Befehl `/sitzungsradar`.
 - Vier Einstellungen: letzten Auftrag zeigen, ruhig ab (Minuten), Panel beim Start öffnen, Ordner.
 
+[0.2.2]: https://github.com/sdaum1909/sitzungsradar/releases/tag/v0.2.2
 [0.2.1]: https://github.com/sdaum1909/sitzungsradar/releases/tag/v0.2.1
 [0.2.0]: https://github.com/sdaum1909/sitzungsradar/commit/a7e903f
 [0.1.0]: https://github.com/sdaum1909/sitzungsradar/commit/f843fe0

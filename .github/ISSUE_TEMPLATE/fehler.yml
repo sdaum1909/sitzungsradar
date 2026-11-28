@@ -13,7 +13,7 @@ body:
     attributes:
       label: Version des Sitzungsradars
       description: Steht in `claude plugin list` oder in `.claude-plugin/plugin.json`.
-      placeholder: "0.2.1"
+      placeholder: "0.2.2"
     validations:
       required: true
   - type: input
