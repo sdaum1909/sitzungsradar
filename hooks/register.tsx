@@ -18,6 +18,8 @@ const WEG_NACH_MS = 3 * 60_000
 const FREIGABE_AB_MS = 60_000
 const AUFRAEUMEN_NACH_MS = 24 * 60 * 60_000
 const AUFRAEUMEN_TAKT_MS = 60_000
+/** Ein Herzschlag ist ein paar hundert Bytes; was größer ist, stammt nicht vom Radar. */
+const EIGEN_MAX_BYTES = 64 * 1024
 const AUFTRAG_LAENGE = 140
 /** Werkzeuge, die auf eine Antwort von dir warten. */
 const FRAGT_DICH = new Set(['AskUserQuestion', 'ExitPlanMode'])
@@ -501,10 +503,24 @@ async function abschliessen($: Api) {
   await $.fs.write(dateiVon(ordner, eigene.id), JSON.stringify(eigene))
 }
 
-/** Löscht Dateien beendeter und lange stiller Sitzungen, höchstens einmal je Minute. */
+/**
+ * Nur eigene Herzschläge: Fassung 1, Kennung und Projekt als Text, und der
+ * Dateiname ist genau der, den das Radar für diese Kennung schreibt. Alles
+ * andere im Ordner gehört jemand anderem und wird nie gelöscht.
+ */
+function eigenerHerzschlag(ordner: string, pfad: string, s: Herzschlag | undefined): s is Herzschlag {
+  return (
+    s?.v === 1 &&
+    typeof s.id === 'string' &&
+    typeof s.projekt === 'string' &&
+    dateiVon(ordner, s.id) === pfad
+  )
+}
+
+/** Löscht eigene Herzschläge beendeter und lange stiller Sitzungen; läuft höchstens einmal je Minute. */
 async function aufraeumen($: Api, pfade: string[], jetzt: number) {
-  if (pfade.length === 0 || jetzt - zuletztAufgeraeumt < AUFRAEUMEN_TAKT_MS) return
   zuletztAufgeraeumt = jetzt
+  if (pfade.length === 0) return
   await $.process.run(['rm', '--', ...pfade]).catch(() => undefined)
 }
 
@@ -536,33 +552,33 @@ async function lesen($: Api) {
   } catch {
     eintraege = [] // Ordner gibt es noch nicht
   }
+  const raeumen = jetzt - zuletztAufgeraeumt >= AUFRAEUMEN_TAKT_MS
   const liste: Herzschlag[] = []
   const weg: string[] = []
   for (const d of eintraege) {
-    if (d.kind !== 'file' || d.isLink || !d.name.endsWith('.json')) continue
+    if (d.kind !== 'file' || d.isLink || !d.name.endsWith('.json') || d.size > EIGEN_MAX_BYTES) continue
     const pfad = `${ordner}/${d.name}`
-    if (jetzt - d.mtimeMs > AUFRAEUMEN_NACH_MS) {
+    const alt = jetzt - d.mtimeMs > AUFRAEUMEN_NACH_MS
+    // Seit 3 min still: zeigt nichts. Älter als 24 h: nur lesen, wenn aufgeräumt wird.
+    if (alt ? !raeumen : jetzt - d.mtimeMs > WEG_NACH_MS) continue
+    let schlag: Herzschlag | undefined
+    try {
+      schlag = JSON.parse(await $.fs.read(pfad)) as Herzschlag
+    } catch {
+      continue // halb geschrieben oder fremd: beim nächsten Takt
+    }
+    if (!eigenerHerzschlag(ordner, pfad, schlag)) continue
+    if (alt || schlag.status === 'beendet') {
       weg.push(pfad)
       continue
     }
-    if (jetzt - d.mtimeMs > WEG_NACH_MS) continue
-    try {
-      const h = JSON.parse(await $.fs.read(pfad)) as Herzschlag
-      if (h?.v !== 1 || typeof h.id !== 'string' || typeof h.projekt !== 'string') continue
-      if (h.status === 'beendet') {
-        weg.push(pfad)
-        continue
-      }
-      if (jetzt - h.zuletzt > WEG_NACH_MS) continue
-      liste.push(h)
-    } catch {
-      // halb geschrieben oder fremd: beim nächsten Takt
-    }
+    if (jetzt - schlag.zuletzt > WEG_NACH_MS) continue
+    liste.push(schlag)
   }
   stand = { liste, ...basis }
   await update($, radar, () => stand)
   statuszeileSetzen($, ordnen(liste, jetzt, cfg.ruhigAbMs))
-  await aufraeumen($, weg, jetzt)
+  if (raeumen) await aufraeumen($, weg, jetzt)
 }
 
 function oeffnen($: Api) {

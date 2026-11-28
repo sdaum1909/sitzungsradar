@@ -1,7 +1,7 @@
 {
   "name": "sitzungsradar",
   "displayName": "Sitzungsradar",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Panel mit allen gerade laufenden Claude-Code-Sitzungen über alle Projekte: Name, Abschnitt und Schritt jeder Sitzung, wer auf dich wartet, und ein Knopf, mit dem du in die Sitzung springst.",
   "author": {
     "name": "BuildMySoftware"
@@ -45,7 +45,7 @@
     "ordner": {
       "type": "string",
       "title": "Ordner für die Herzschläge",
-      "description": "Leer lassen für ~/.claude/sitzungsradar. Alle Sitzungen müssen denselben Ordner nutzen.",
+      "description": "Leer lassen für ~/.claude/sitzungsradar. Sonst einen eigenen, leeren Ordner. Alle Sitzungen müssen denselben Ordner nutzen.",
       "default": ""
     }
   }

@@ -145,7 +145,7 @@ jede Einstellung hat einen Standardwert.
 | `zeige_auftrag` | Letzten Auftrag zeigen | an | Zeigt unter jeder Sitzung den Anfang deiner letzten Eingabe |
 | `ruhig_ab_minuten` | Ruhig ab (Minuten) | 15 | Ab wann eine wartende Sitzung blass gezeigt wird |
 | `beim_start_oeffnen` | Panel beim Start öffnen | an | Öffnet das Panel in jeder neuen Sitzung |
-| `ordner` | Ordner für die Herzschläge | leer | Leer heißt `~/.claude/sitzungsradar`; alle Sitzungen müssen denselben Ordner nutzen |
+| `ordner` | Ordner für die Herzschläge | leer | Leer heißt `~/.claude/sitzungsradar`. Nimm sonst einen eigenen, leeren Ordner. Alle Sitzungen müssen denselben nutzen |
 
 Ändern kannst du sie jederzeit in Claude Code mit `/plugin configure sitzungsradar@sitzungsradar`,
 oder aus einer Shell:
@@ -180,7 +180,8 @@ auch `~/claude-plugins/sitzungsradar/`. Beide kannst du danach von Hand löschen
 Jede Sitzung, in der das Sitzungsradar läuft, schreibt alle 20 Sekunden und bei jedem Wechsel
 (Auftrag gestartet, Werkzeug läuft, fertig) eine kleine Datei nach `~/.claude/sitzungsradar/`.
 Jedes Panel liest diesen Ordner alle 5 Sekunden. Beendete Sitzungen verschwinden sofort,
-abgestürzte nach drei Minuten Stille. Alte Dateien räumt das Radar selbst weg.
+abgestürzte nach drei Minuten Stille. Alte Dateien räumt das Radar selbst weg, aber nur seine eigenen:
+Andere Dateien im Ordner fasst es nie an.
 
 Name, Kapitel, Schritt und Stand liest jede Sitzung aus ihrem eigenen Protokoll, beim Start einmal von hinten
 und danach nur die neuen Zeilen. Wechselt sie das Kapitel oder hakt einen Schritt ab, steht das sofort
@@ -190,12 +191,18 @@ in ihrer Datei.
 
 Alles bleibt auf deinem Rechner. Das Sitzungsradar sendet nichts ins Netz und ruft kein Modell auf;
 das Manifest gibt ihm keinen einzigen Netzwerk-Host frei (`"network": { "hosts": [] }`).
-In den Dateien stehen Projektname, Ordner, Modell, Zustand, das laufende Werkzeug, der Name der Sitzung,
+In den Dateien stehen Projektname, Ordner, Name des Worktrees, Modell, Oberfläche (etwa Terminal oder Desktop-App),
+Zustand, das laufende Werkzeug, der Name der Sitzung,
 ihr Kapitel, Schritt und Stand (je höchstens 80 Zeichen), die Kennung für den Sprung und, wenn du es
 nicht abschaltest, die ersten 140 Zeichen deiner letzten Eingabe. Schalte „Letzten Auftrag zeigen“
 aus, wenn du das nicht willst; dann schreibt das Radar die Eingabe auch nicht mehr in die Datei.
 Für Name, Kapitel, Schritt und Stand liest jede Sitzung ihr eigenes Protokoll auf deinem Rechner und
 übernimmt daraus nur diese Angaben.
+
+Das Radar startet genau zwei Programme: `rm -- <Datei>` für die eigenen Dateien beendeter oder seit
+24 Stunden stiller Sitzungen und, wenn du „Öffnen“ drückst, `open <Link>` (macOS) bzw.
+`rundll32 url.dll,FileProtocolHandler <Link>` (Windows). Aus der Umgebung liest es nur `HOME` (für den
+Standardordner) und `CLAUDE_CODE_HOST_SESSION_ID` (die Kennung der Desktop-Sitzung für den Sprung).
 
 Lies den Quelltext, bevor du ein Plugin installierst. Das gilt für jedes Plugin, auch für dieses.
 Das ganze Verhalten steht in [`hooks/register.tsx`](hooks/register.tsx).
@@ -239,6 +246,17 @@ verify it with `shasum -a 256 -c SHA256SUMS.txt`, unzip it to a permanent place 
 `unzip sitzungsradar.zip -d ~/claude-plugins`, then
 `claude plugin install sitzungsradar --marketplace ~/claude-plugins/sitzungsradar`.
 Keep that folder: Claude Code loads the plugin from it on every start.
+
+**What it reads, writes and runs.** Each session writes one small JSON status file to
+`~/.claude/sitzungsradar/`: project name, working folder, worktree name, model, surface (such as
+terminal or desktop app), state, the running tool, the session's title, chapter, step and status line, the desktop session
+ID, and, unless you turn it off, the first 140 characters of your last prompt. It reads its own session
+transcript for title, chapter and step, and the environment variables `HOME` and
+`CLAUDE_CODE_HOST_SESSION_ID`. It runs two commands: `rm -- <file>` to delete its own status files of
+sessions that ended or have been silent for 24 hours, and `open <link>` (macOS) or
+`rundll32 url.dll,FileProtocolHandler <link>` (Windows) when you press **Öffnen**, with a link of the form
+`claude://code/continue?session=<id>`. It never touches other files in that folder. It has no network
+access (`network.hosts` is empty) and makes no model calls.
 
 ## Lizenz
 

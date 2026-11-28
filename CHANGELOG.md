@@ -4,6 +4,20 @@ Alle nennenswerten Änderungen am Sitzungsradar. Die Versionsnummern folgen
 [Semantic Versioning](https://semver.org/lang/de/); die Fassung im Manifest
 (`.claude-plugin/plugin.json`) und der Git-Tag stimmen immer überein.
 
+## [0.2.3] – 2026-11-28
+
+### Behoben
+- Das Aufräumen löscht nur noch eigene Herzschlag-Dateien: Der Dateiname passt zur Kennung im Inhalt,
+  die Datei ist lesbar und höchstens 64 KB groß. Bisher löschte es jede `.json`-Datei im Ordner, die
+  älter als 24 Stunden war. Zeigte die Einstellung `ordner` auf einen gemeinsam genutzten Ordner,
+  traf das auch fremde Dateien.
+- Alte Dateien liest das Radar nur noch beim Aufräumen, also höchstens einmal je Minute.
+
+### Dokumentation
+- SECURITY.md und README nennen jetzt beide Programme, die das Radar startet (`rm`, `open` bzw.
+  `rundll32`), und die Umgebungsvariablen, die es liest (`HOME`, `CLAUDE_CODE_HOST_SESSION_ID`).
+- Die Einstellung `ordner` rät zu einem eigenen, leeren Ordner.
+
 ## [0.2.2] – 2026-11-28
 
 ### Behoben
@@ -46,6 +60,7 @@ Am Code des Plugins hat sich nichts geändert.
 - Kurzzeile in der Statusleiste und Befehl `/sitzungsradar`.
 - Vier Einstellungen: letzten Auftrag zeigen, ruhig ab (Minuten), Panel beim Start öffnen, Ordner.
 
+[0.2.3]: https://github.com/sdaum1909/sitzungsradar/releases/tag/v0.2.3
 [0.2.2]: https://github.com/sdaum1909/sitzungsradar/releases/tag/v0.2.2
 [0.2.1]: https://github.com/sdaum1909/sitzungsradar/releases/tag/v0.2.1
 [0.2.0]: https://github.com/sdaum1909/sitzungsradar/commit/a7e903f

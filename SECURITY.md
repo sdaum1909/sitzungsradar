@@ -29,3 +29,10 @@ Damit du einschätzen kannst, was eine Lücke bedeuten würde:
 - **Dateien:** Es schreibt und liest nur seinen Ordner (Standard `~/.claude/sitzungsradar/`) und liest
   das Protokoll der eigenen Sitzung, um Name, Kapitel, Schritt und Stand zu übernehmen.
 - **Sprung:** Der Knopf „Öffnen“ ruft einen Link der Form `claude://code/continue?session=<Kennung>` auf.
+- **Programme:** Das Radar startet genau zwei Programme. `rm -- <Datei>` löscht eigene Herzschlag-Dateien
+  beendeter oder seit 24 Stunden stiller Sitzungen. Für den Knopf „Öffnen“ ruft es `open <Link>` (macOS)
+  oder `rundll32 url.dll,FileProtocolHandler <Link>` (Windows) auf.
+- **Löschen:** Es löscht nur Dateien, die es als eigene erkennt: Der Dateiname passt zur Kennung im Inhalt.
+  Andere Dateien im Ordner rührt es nicht an.
+- **Umgebung:** Es liest `HOME` für den Standardordner und `CLAUDE_CODE_HOST_SESSION_ID`, die Kennung der
+  Desktop-Sitzung für den Sprung.

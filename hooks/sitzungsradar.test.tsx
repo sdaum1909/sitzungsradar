@@ -195,6 +195,29 @@ test('ohne Auftrag in den Einstellungen bleibt die Eingabe verborgen', { options
   await ui.unmount()
 })
 
+test('das Aufräumen löscht nur eigene Herzschläge, nie fremde Dateien im Ordner', async ($, on) => {
+  const ALT = JETZT - 25 * 60 * 60_000
+  const { geloescht } = welt(on, {
+    // eigener Herzschlag, seit 25 h still: weg
+    [`${ORDNER}/alt.json`]: datei(schlag({ id: 'alt', projekt: 'Alt', zuletzt: ALT }), ALT),
+    // eigener Herzschlag einer beendeten Sitzung: weg
+    [`${ORDNER}/fertig.json`]: datei(schlag({ id: 'fertig', projekt: 'Fertig', status: 'beendet' })),
+    // fremde Datei, alt: bleibt
+    [`${ORDNER}/notizen.json`]: { text: '{"a":1}', mtimeMs: ALT },
+    // sieht aus wie ein Herzschlag, aber der Name passt nicht zur Kennung: bleibt
+    [`${ORDNER}/kopie.json`]: datei(schlag({ id: 'andere', projekt: 'Kopie', zuletzt: ALT }), ALT),
+    [`${ORDNER}/sicherung.json`]: datei(schlag({ id: 'fertig', projekt: 'Fertig', status: 'beendet' })),
+    // halb geschrieben: bleibt
+    [`${ORDNER}/halb.json`]: { text: '{"v":1,"id":"ha', mtimeMs: ALT },
+    // zu groß für einen Herzschlag: wird gar nicht erst gelesen
+    [`${ORDNER}/gross.json`]: datei(schlag({ id: 'gross', projekt: 'x'.repeat(70_000), zuletzt: ALT }), ALT),
+  })
+
+  await $.session.start({ cwd: '/h/code/website', surface: 'desktop', isInteractive: true })
+
+  expect([...geloescht].sort()).toEqual([`${ORDNER}/alt.json`, `${ORDNER}/fertig.json`])
+})
+
 test('Projektname, Dauer und Lage', () => {
   expect(projektVon('/u/x/website/.claude/worktrees/abc')).toEqual({ projekt: 'website', zweig: 'abc' })
   expect(projektVon('/u/x/shop-relaunch/src', '/u/x/shop-relaunch')).toEqual({ projekt: 'shop-relaunch' })
